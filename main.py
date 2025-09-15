@@ -11,6 +11,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi import Query, Path
 from typing import Optional
 
+from models.coursework import CourseworkCreate, CourseworkRead, CourseworkUpdate
+from models.assignment import AssignmentCreate, AssignmentRead, AssignmentUpdate
 from models.person import PersonCreate, PersonRead, PersonUpdate
 from models.address import AddressCreate, AddressRead, AddressUpdate
 from models.health import Health
@@ -22,10 +24,12 @@ port = int(os.environ.get("FASTAPIPORT", 8000))
 # -----------------------------------------------------------------------------
 persons: Dict[UUID, PersonRead] = {}
 addresses: Dict[UUID, AddressRead] = {}
+courseworks: Dict[UUID, CourseworkRead] = {}
+assignments: Dict[UUID, AssignmentRead] = {}
 
 app = FastAPI(
-    title="Person/Address API",
-    description="Demo FastAPI app using Pydantic v2 models for Person and Address",
+    title="Person/Address/Assignment/Coursework API",
+    description="Demo FastAPI app using Pydantic v2 models for Person, Address, Assignment, and Coursework.",
     version="0.1.0",
 )
 
@@ -158,6 +162,107 @@ def update_person(person_id: UUID, update: PersonUpdate):
     stored.update(update.model_dump(exclude_unset=True))
     persons[person_id] = PersonRead(**stored)
     return persons[person_id]
+
+# -----------------------------------------------------------------------------
+# Coursework endpoints
+# -----------------------------------------------------------------------------
+
+@app.post("/courseworks", response_model=CourseworkRead, status_code=201)
+def create_coursework(coursework: CourseworkCreate):
+    coursework_read = CourseworkRead(**coursework.model_dump())
+    courseworks[coursework_read.id] = coursework_read
+    return coursework_read
+
+@app.get("/courseworks", response_model=List[CourseworkRead])
+def list_courseworks(
+    title: Optional[str] = Query(None, description="Filter by coursework title"),
+    semester: Optional[str] = Query(None, description="Filter by semester"),
+    professor_uni: Optional[str] = Query(None, description="Filter by professor's UNI"),
+    person_uni: Optional[str] = Query(None, description="Filter by UNI of any enrolled person"),
+):
+    results = list(courseworks.values())
+
+    if title is not None:
+        results = [c for c in results if c.title == title]
+    if semester is not None:
+        results = [c for c in results if c.semester == semester]
+    if professor_uni is not None:
+        results = [c for c in results if c.professor.uni == professor_uni]
+    if person_uni is not None:
+        results = [c for c in results if any(p.uni == person_uni for p in c.people)]
+
+    return results
+
+@app.get("/courseworks/{coursework_id}", response_model=CourseworkRead)
+def get_coursework(coursework_id: UUID):
+    if coursework_id not in courseworks:
+        raise HTTPException(status_code=404, detail="Coursework not found")
+    return courseworks[coursework_id]
+
+@app.patch("/courseworks/{coursework_id}", response_model=CourseworkRead)
+def update_coursework(coursework_id: UUID, update: CourseworkUpdate):
+    if coursework_id not in courseworks:
+        raise HTTPException(status_code=404, detail="Coursework not found")
+    stored = courseworks[coursework_id].model_dump()
+    stored.update(update.model_dump(exclude_unset=True))
+    courseworks[coursework_id] = CourseworkRead(**stored)
+    return courseworks[coursework_id]
+
+@app.delete("/courseworks/{coursework_id}", status_code=204)
+def delete_coursework(coursework_id: UUID):
+    if coursework_id not in courseworks:
+        raise HTTPException(status_code=404, detail="Coursework not found")
+    del courseworks[coursework_id]
+    return
+
+
+# ------------------------------------------------------------------------------
+# Assignment endpoints
+# -----------------------------------------------------------------------------
+@app.post("/assignments", response_model=AssignmentRead, status_code=201)
+def create_assignment(assignment: AssignmentCreate):
+    assignment_read = AssignmentRead(**assignment.model_dump())
+    assignments[assignment_read.id] = assignment_read
+    return assignment_read  
+
+@app.get("/assignments", response_model=List[AssignmentRead])
+def list_assignments(
+    title: Optional[str] = Query(None, description="Filter by assignment title"),
+    due_date: Optional[str] = Query(None, description="Filter by due date (YYYY-MM-DD)"),
+    coursework_id: Optional[UUID] = Query(None, description="Filter by associated coursework ID"),
+):
+    results = list(assignments.values())
+
+    if title is not None:
+        results = [a for a in results if a.title == title]
+    if due_date is not None:
+        results = [a for a in results if str(a.due_date) == due_date]
+    if coursework_id is not None:
+        results = [a for a in results if a.coursework.id == coursework_id]
+
+    return results
+
+@app.get("/assignments/{assignment_id}", response_model=AssignmentRead)
+def get_assignment(assignment_id: UUID):
+    if assignment_id not in assignments:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return assignments[assignment_id]
+
+@app.patch("/assignments/{assignment_id}", response_model=AssignmentRead)
+def update_assignment(assignment_id: UUID, update: AssignmentUpdate):
+    if assignment_id not in assignments:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    stored = assignments[assignment_id].model_dump()
+    stored.update(update.model_dump(exclude_unset=True))
+    assignments[assignment_id] = AssignmentRead(**stored)
+    return assignments[assignment_id]
+
+@app.delete("/assignments/{assignment_id}", status_code=204)
+def delete_assignment(assignment_id: UUID):
+    if assignment_id not in assignments:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    del assignments[assignment_id]
+    return
 
 # -----------------------------------------------------------------------------
 # Root
