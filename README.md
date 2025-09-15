@@ -1,4 +1,4 @@
-### This is for the first assignment if the course CS4153 - Cloud Computing at Columbia University ☁️
+### This is the first assignment of CS4153 - Cloud Computing at Columbia University ☁️
 
 
 #### Check out the demo:
